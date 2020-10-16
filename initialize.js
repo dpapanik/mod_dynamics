@@ -1,6 +1,15 @@
-// Last Update: Oct 13, 2020
+// Last Update: Oct 15, 2020
 // © Dimitris Papanikolaou
 // This code first creates inFlows and outFlows, then it decomposes inFlows and outFlows into trend and seasonality flows, and then it integrates levels
+
+/***** SIMPLER VERSION ******/
+/***** SIMPLER VERSION ******/
+/***** SIMPLER VERSION ******/
+/***** SIMPLER VERSION ******/
+/***** SIMPLER VERSION ******/
+/***** SIMPLER VERSION ******/
+/***** SIMPLER VERSION ******/
+
 
 
 
@@ -64,17 +73,15 @@ function initialize(trips,timeRange){
 
 	addBundledTrips(stocks, trips, timeRange);
 
-	var flowRates = getFlowRatesFromBundledTrips(stocks);
-	var seasonaTrendlFlowRates = getSeasonaTrendlFlowRates(flowRates);
+	var flowRates = getFlowRates(stocks);
 
-	integrateLevels(flowRates);
-	integrateLevels(seasonaTrendlFlowRates);
+	var levels = integrateLevels(flowRates);
 
 
 	addStats(stocks);
  // correctDynamics(stocks, 1, 1);
-	setDomains_v3(stocks);
-	setMarginalLevels(stocks);
+	// setDomains_v3(stocks);
+	// setMarginalLevels(stocks);
 	stocks.sort(sortC); //.sort(sortA)
 	// d3.shuffle(stocks);
 
@@ -129,13 +136,9 @@ function sortD(a,b){
 	}
 };
 
-
-
-
-
 /*********   System Setup  *********/
-/****** Get Stocks & Vehicles ******/
 
+/****** Get Stocks & Vehicles ******/
 function getStocksAndVehicles(trips, timeRange){
 	// Returns vehicles as objects
 	// Best one
@@ -201,6 +204,8 @@ function getStocksAndVehicles(trips, timeRange){
 		vehicles: vehicles
 	}
 }
+
+/****** Add Bundled Trips ******/
 function addBundledTrips(stocks, trips, timeRange){
 	console.log("bundling trips...");
 	var timeStep = timeRange[1] - timeRange[0];
@@ -236,11 +241,9 @@ function addBundledTrips(stocks, trips, timeRange){
 }
 
 /******* Get Flow Rates *******/
-/******* Get Flow Rates *******/
-
-function getFlowRatesFromBundledTrips(stocks){
+function getFlowRates(BundledTrips){
 	console.log("making flow rates...");
-  return stocks.map(function(stock){
+  return BundledTrips.map(function(stock){
     return{
       id : stock.id,
       name : stock.name,
@@ -260,22 +263,19 @@ function getFlowRatesFromBundledTrips(stocks){
   })
 }
 
-
 /**** Decompose Flow Rates ****/
-/**** Decompose Flow Rates ****/
-
-// Get new seasonal/trend flow dynamics (without modifying originals)
-function getSeasonalFlowRates(stocks){
-  // returns a copy of stocks focusing only on trend dynamics
+/**** Get Seasonal Flow Rates ****/
+function getSeasonalFlowRates(flowRates){
+  // returns a copy of flowRates (stocks) focusing only on trend dynamics
 	var result = [];
 
-	stocks.filter(function(d){return d.type=="station"}).map(function(d){
-		var inFlowMass = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
-		var outFlowMass = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
-		var trend = inFlowMass==0 && outFlowMass==0? 0 : (inFlowMass-outFlowMass)/Math.max(inFlowMass,outFlowMass);
-		var empty_inFlowMass = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
-		var empty_outFlowMass = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
-		var empty_trend = empty_inFlowMass==0 && empty_outFlowMass==0? 0 : (empty_inFlowMass-empty_outFlowMass)/Math.max(empty_inFlowMass,empty_outFlowMass);
+	flowRates.filter(function(d){return d.type=="station"}).map(function(d){
+		var inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
+		var outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
+		var trend = inFlows_full_total==0 && outFlows_full_total==0? 0 : (inFlows_full_total-outFlows_full_total)/Math.max(inFlows_full_total,outFlows_full_total);
+		var empty_inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
+		var empty_outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
+		var empty_trend = empty_inFlows_full_total==0 && empty_outFlows_full_total==0? 0 : (empty_inFlows_full_total-empty_outFlows_full_total)/Math.max(empty_inFlows_full_total,empty_outFlows_full_total);
 
 		result.push({
 			id : d.id,
@@ -296,7 +296,7 @@ function getSeasonalFlowRates(stocks){
 			})
 		});
 
-	stocks.filter(function(d){return d.type=="inTransit"}).map(function(d){
+	flowRates.filter(function(d){return d.type=="inTransit"}).map(function(d){
     result.push({
 			id : "inTransit",
 			name : "inTransit",
@@ -318,7 +318,7 @@ function getSeasonalFlowRates(stocks){
 		});
 	});
 
-	stocks.filter(function(d){return d.type=="dispatched"}).map(function(d){
+	flowRates.filter(function(d){return d.type=="dispatched"}).map(function(d){
      result.push({
 			id : "dispatched",
 			name : "dispatched",
@@ -342,17 +342,20 @@ function getSeasonalFlowRates(stocks){
 
 	return result;
 }
-function getTrendFlowRates(stocks){
-  // returns a copy of stocks focusing only on trend dynamics
+
+/**** Decompose Flow Rates ****/
+/**** Get Trend Flow Rates ****/
+function getTrendFlowRates(flowRates){
+  // returns a copy of flowRates (stocks) focusing only on trend dynamics
 	var result = [];
 
-	stocks.filter(function(d){return d.type=="station"}).map(function(d){
-		var inFlowMass = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
-		var outFlowMass = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
-		var trend = inFlowMass==0 && outFlowMass==0? 0 : (inFlowMass-outFlowMass)/Math.max(inFlowMass,outFlowMass);
-		var empty_inFlowMass = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
-		var empty_outFlowMass = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
-		var empty_trend = empty_inFlowMass==0 && empty_outFlowMass==0? 0 : (empty_inFlowMass-empty_outFlowMass)/Math.max(empty_inFlowMass,empty_outFlowMass);
+	flowRates.filter(function(d){return d.type=="station"}).map(function(d){
+		var inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
+		var outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
+		var trend = inFlows_full_total==0 && outFlows_full_total==0? 0 : (inFlows_full_total-outFlows_full_total)/Math.max(inFlows_full_total,outFlows_full_total);
+		var empty_inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
+		var empty_outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
+		var empty_trend = empty_inFlows_full_total==0 && empty_outFlows_full_total==0? 0 : (empty_inFlows_full_total-empty_outFlows_full_total)/Math.max(empty_inFlows_full_total,empty_outFlows_full_total);
 
 		result.push({
 			id : d.id,
@@ -373,7 +376,7 @@ function getTrendFlowRates(stocks){
 		});
 	});
 
-	stocks.filter(function(d){return d.type=="inTransit"}).map(function(d){
+	flowRates.filter(function(d){return d.type=="inTransit"}).map(function(d){
     result.push({
 			id : "inTransit",
 			name : "inTransit",
@@ -395,7 +398,7 @@ function getTrendFlowRates(stocks){
 		});
 	});
 
-	stocks.filter(function(d){return d.type=="dispatched"}).map(function(d){
+	flowRates.filter(function(d){return d.type=="dispatched"}).map(function(d){
 		 result.push({
 			id : "dispatched",
 			name : "dispatched",
@@ -420,21 +423,32 @@ function getTrendFlowRates(stocks){
 	return result;
 }
 
-
-
 /****** Integrate Levels ******/
-/****** Integrate Levels ******/
-function integrateLevels(stocks){
+function integrateLevels(stocks, domains){
 	for (var i=0; i<stocks[0].values.length; i++){
-		stocks.forEach(function(d){
-			if (i==0){
-				d.values[i].level = d.initial;
-			} else {
-				d.values[i].level = d.values[i-1].level + d.values[i].inFlows_full + d.values[i].inFlows_empty - d.values[i].outFlows_full - d.values[i].outFlows_empty;
-			}
+		stocks.forEach(function(d, k){
+			d.level = d.initial + d3.sum(d.values.slice(0,i+1), function(tStep){
+				return tStep.inFlows_full + tStep.inFlows_empty - tStep.outFlows_full - tStep.outFlows_empty;
+			});
 		});
 	}
+	return stocks;
 }
+
+/****** Get Levels ******/
+function getLevels(flowRates, domains){
+	return flowRates.map(function(d){
+		var result = {};
+		Object.keys(d).forEach(key =>	result[key] = d[key]);
+		result.values.forEach(function(entry,i){
+			entry.level = d.initial + d3.sum(d.values.slice(0,i+1), function(tStep){
+				return tStep.inFlows_full + tStep.inFlows_empty - tStep.outFlows_full - tStep.outFlows_empty;
+			});
+		})
+		return result;
+	});
+}
+
 
 /********   Set Domains    *******/
 function setDomains(stocks){
@@ -444,7 +458,7 @@ function setDomains(stocks){
 		d.domains.level = d3.extent(d.values, function(d){return d.level});
 		d.domains.inFlows_full = d3.extent(d.values, function(d){return d.inFlows_full});
     d.domains.inFlows_empty = d3.extent(d.values, function(d){return d.inFlows_empty});
-    d.domains.inFlows_empty = d3.extent(d.values, function(d){return d.inFlows_empty});
+    d.domains.outFlows_full = d3.extent(d.values, function(d){return d.outFlows_full});
     d.domains.outFlows_empty = d3.extent(d.values, function(d){return d.outFlows_empty});
 	});
 	return stocks;
@@ -458,91 +472,49 @@ function getStocksWithMinimumInitials(stocks){
 	})
 }
 
-
-/****** Set Minimum Levels ******/
-function addMinimumLevels_test(stocks){
-	console.log("adding minimum levels...");
-	stocks.forEach(function(d){
-		d.values.forEach(function(tStep){
-			tStep.levels.minimum_net = tStep.levels.net -d.domains.levels.net[0];
-			tStep.levels.minimum_full = tStep.levels.full -d.domains.levels.full[0];
-			tStep.levels.minimum_empty = tStep.levels.empty -d.domains.levels.empty[0];
-			tStep.levels.minimum_seasonal = tStep.levels.seasonal -d.domains.levels.seasonal[0];
-			tStep.levels.minimum_trend = tStep.levels.trend -d.domains.levels.trend[0];
-		});
-	})
-}
-function addMarginalLevels(stocks){
-	console.log("setting marginal levels...");
-	stocks.forEach(function(d){
-		d.values.forEach(function(tStep){
-			tStep.bikesMarginal= tStep.bikesUncorrected-d.domains.bikesUncorrected[0];
-			tStep.bikesMinimum= tStep.bikes-d.domains.bikes[0];
-			tStep.bikesUncorrectedSeasonal= tStep.bikesUncorrectedSeasonal-d.domains.bikesUncorrectedSeasonal[0];
-			tStep.bikesUncorrectedTrend= tStep.bikesUncorrectedTrend-d.domains.bikesUncorrectedTrend[0];
-		});
-	})
-}
-function getMarginalLevels(stocks){
-	return stocks.map(function(d){
-		d.values = d.values.map(function(tStep){
-			var value={};
-			value.date = tStep.date;
-			value.bikesMarginal= tStep.userLevels-d.domains.userLevels[0];
-			value.bikesMinimum= tStep.correctedLevels-d.domains.correctedLevels[0];
-			value.userLevelsSeasonalMinimum= tStep.userLevelsSeasonal-d.domains.userLevelsSeasonal[0];
-			value.userLevelsTrendMinimum= tStep.userLevelsTrend-d.domains.userLevelsTrend[0];
-			return value;
-		});
-		return d;
-	})
-}
-
 /*********   Add Stats   *********/
 function addStats(stocks){
 	console.log("adding stats...");
 	stocks.forEach(function(d){
 		d.stats = (function(){
-			var inFlowMass = d3.sum(d.values, function(tStep){return tStep.userInFlowRate})
-			var outFlowMass = d3.sum(d.values, function(tStep){return tStep.userOutFlowRate})
-			var inFlow_xCoor = (d3.sum(d.values, function(tStep,i){return tStep.userInFlowRate * i}) ) / inFlowMass;
-			var outFlow_xCoor = (d3.sum(d.values, function(tStep,i){return Math.abs(tStep.userOutFlowRate * i)}) ) / outFlowMass;
-			var trend = inFlowMass>0 && outFlowMass >0 ? (inFlowMass-outFlowMass)/Math.max(inFlowMass,outFlowMass) : 0;
+			var inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_full})
+			var outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_full})
+			var inFlows_full_T = (d3.sum(d.values, function(tStep,i){return tStep.inFlows_full * i}) ) / inFlows_full_total;
+			var outFlows_full_T = (d3.sum(d.values, function(tStep,i){return Math.abs(tStep.outFlows_full * i)}) ) / outFlows_full_total;
+			var trend = (inFlows_full_total-outFlows_full_total)/Math.max(inFlows_full_total,outFlows_full_total);
 			var occupancy = d3.sum(d.values, function(tStep, i){
 				return d3.sum(d.values.slice(0,i+1), function(k){
-					return k.userInFlowRate - k.userOutFlowRate;
+					return k.inFlows_full - k.outFlows_full;
 				})
 			});
 			var occupancy_positive = d3.sum(d.values, function(tStep, i){
 				return Math.max(0, d3.sum(d.values.slice(0,i+1), function(k){
-					return k.userInFlowRate-k.userOutFlowRate;
+					return k.inFlows_full-k.outFlows_full;
 				}));
 			});
 			var occupancy_negative = d3.sum(d.values, function(tStep, i){
 				return Math.min(0, d3.sum(d.values.slice(0,i+1), function(k){
-					return k.userInFlowRate-k.userOutFlowRate;
+					return k.inFlows_full-k.outFlows_full;
 				}));
 			});
 			var occupancy_trend = d3.sum(d.values, function(tStep, i){
 				return d3.sum(d.values.slice(0,i+1), function(k){
 					if(trend>=0){
-						return trend * k.userInFlowRate;
+						return trend * k.inFlows_full;
 					} else {
-						return trend * k.userOutFlowRate
+						return trend * k.outFlows_full
 					}
 				});
 			});
 			var occupancy_seasonal = d3.sum(d.values, function(tStep, i){
 				return d3.sum(d.values.slice(0,i+1), function(k){
 					if(trend>=0){
-						return (1-trend) * k.userInFlowRate - k.userOutFlowRate;
+						return (1-trend) * k.inFlows_full - k.outFlows_full;
 					} else {
-						return k.userOutFlowRate - (1-trend) * k.userOutFlowRate;
+						return k.outFlows_full - (1-trend) * k.outFlows_full;
 					}
 				});
 			});
-
-
 			return {
 				'trend'	: trend,
 				'occupancy' : occupancy,
@@ -550,31 +522,28 @@ function addStats(stocks){
 				'occupancy_negative' : occupancy_negative,
 				'occupancy_trend' : occupancy_trend,
 				'occupancy_seasonal' : occupancy_seasonal,
-				'inFlowMass' : inFlowMass,
-				'inFlow_xCoor': inFlow_xCoor,
-				'outFlowMass' : outFlowMass,
-				'outFlow_xCoor': outFlow_xCoor,
-				'res_degree' : -occupancy,
-				// 'res_degree' : inFlow_xCoor-outFlow_xCoor,
-				// 'res_degree' : (d3.sum(stocks.filter(function(d){return d.type=="inTransit"})[0].values, function(tStep,i){return Math.abs(tStep.userOutFlowRate * i)}) ) / d3.sum(stocks.filter(function(d){return d.type=="inTransit"})[0].values, function(tStep){return tStep.userOutFlowRate}) - outFlow_xCoor,
-				'sur_degree' : inFlowMass-outFlowMass,
+				'inFlows_full_total' : inFlows_full_total,
+				'inFlows_full_T': inFlows_full_T,
+				'outFlows_full_total' : outFlows_full_total,
+				'outFlows_full_T': outFlows_full_T,
+				'res_degree' : inFlows_full_T-outFlows_full_T,
+				'sur_degree' : inFlows_full_total-outFlows_full_total,
 
 				'type': (function(){
-					var rescom = inFlow_xCoor>=outFlow_xCoor? 'Res' : 'Com';
-					var surshor = inFlowMass>=outFlowMass? 'Sur' : 'Def';
+					var rescom = inFlows_full_T>=outFlows_full_T? 'Res' : 'Com';
+					var surshor = inFlows_full_total>=outFlows_full_total? 'Sur' : 'Def';
 					return rescom + surshor;
 				})(),
 				'RCSD': (function(){
 					var RCSD = [];
-					RCSD[0] = inFlow_xCoor>=outFlow_xCoor? 'R' : 'C';
-					RCSD[1] = inFlowMass>=outFlowMass? 'S' : 'D';
+					RCSD[0] = inFlows_full_T>=outFlows_full_T? 'R' : 'C';
+					RCSD[1] = inFlows_full_total>=outFlows_full_total? 'S' : 'D';
 					return RCSD;
 				})()
 			};
 		})();
 	})
 }
-
 
 
 
@@ -1136,8 +1105,8 @@ function averageValues(stocks, timeStep){
 				bikesUncorrected:d3.mean(entry.values, function(d){return d.bikesUncorrected}),
 				dispatchInFlowRate:d3.mean(entry.values, function(d){return d.dispatchInFlowRate}),
 				dispatchOutFlowRate:d3.mean(entry.values, function(d){return d.dispatchOutFlowRate}),
-				userInFlowRate:d3.mean(entry.values, function(d){return d.userInFlowRate}),
-				userOutFlowRate:d3.mean(entry.values, function(d){return d.userOutFlowRate}),
+				inFlows_full:d3.mean(entry.values, function(d){return d.inFlows_full}),
+				outFlows_full:d3.mean(entry.values, function(d){return d.outFlows_full}),
 				// incoming_empty_trips: d3.merge(entry.values, function(d){return d.incoming_empty_trips}),
 				// incoming_full_trips: d3.merge(entry.values, function(d){return d.incoming_full_trips}),
 				// outgoing_empty_trips: d3.merge(entry.values, function(d){return d.outgoing_empty_trips}),
@@ -1154,7 +1123,7 @@ function setCorrectionFlowRates(stocks){
 		stock.values.forEach(function(tStep,i){
 			var allDispatchOutFlowRates = d3.sum(stocks, function(_stock){
 				if (_stock.type=="station"){
-					var diff = _stock.values[i].userInFlowRate-_stock.values[i].userOutFlowRate;
+					var diff = _stock.values[i].inFlows_full-_stock.values[i].outFlows_full;
 					if (diff>=0){
 						return diff;
 					} else {
@@ -1164,7 +1133,7 @@ function setCorrectionFlowRates(stocks){
 			});
 			var allDispatchInFlowRatesDemand = d3.sum(stocks, function(_stock){
 				if (_stock.type=="station"){
-					var diff = _stock.values[i].userInFlowRate-_stock.values[i].userOutFlowRate;
+					var diff = _stock.values[i].inFlows_full-_stock.values[i].outFlows_full;
 					if (diff>=0){
 						return 0;
 					} else {
@@ -1173,7 +1142,7 @@ function setCorrectionFlowRates(stocks){
 				}
 			});
 
-			var diff = tStep.userInFlowRate-tStep.userOutFlowRate;
+			var diff = tStep.inFlows_full-tStep.outFlows_full;
 			if (diff>=0){
 				tStep.dispatchOutFlowRate = diff;
 				tStep.dispatchInFlowRate = 0;
@@ -1196,26 +1165,26 @@ function correctDynamics(stocks, dispatchWeight, dispatchDelay){
 				stock.values[i].bikes = stock.initial;
 				stock.values[i].bikesUncorrected = stock.initial;
 			} else {
-				stock.values[i].bikes = stock.values[i-1].bikes - stock.values[i-1].userOutFlowRate + stock.values[i-1].userInFlowRate - stock.values[i-1].dispatchOutFlowRate + stock.values[i-1].dispatchInFlowRate;
-				stock.values[i].bikesUncorrected = stock.values[i-1].bikesUncorrected - stock.values[i-1].userOutFlowRate + stock.values[i-1].userInFlowRate;
+				stock.values[i].bikes = stock.values[i-1].bikes - stock.values[i-1].outFlows_full + stock.values[i-1].inFlows_full - stock.values[i-1].dispatchOutFlowRate + stock.values[i-1].dispatchInFlowRate;
+				stock.values[i].bikesUncorrected = stock.values[i-1].bikesUncorrected - stock.values[i-1].outFlows_full + stock.values[i-1].inFlows_full;
 			}
 		});
 
 		var allDiff =  d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){
-			return -Math.min(0, d.values[i].userInFlowRate-d.values[i].userOutFlowRate + d.values[i].dispatchInFlowRate-d.values[i].dispatchOutFlowRate);
+			return -Math.min(0, d.values[i].inFlows_full-d.values[i].outFlows_full + d.values[i].dispatchInFlowRate-d.values[i].dispatchOutFlowRate);
 		});
 		var dispatchedBikesInTransit = stocks.filter(function(d){return d.type=="dispatched"})[0].values[i].bikes;
 
 		stocks.forEach(function(stock){
 			if(stock.type=="station"){
-				var netInFlowRate = stock.values[i].userInFlowRate-stock.values[i].userOutFlowRate + stock.values[i].dispatchInFlowRate-stock.values[i].dispatchOutFlowRate;
+				var netInFlowRate = stock.values[i].inFlows_full-stock.values[i].outFlows_full + stock.values[i].dispatchInFlowRate-stock.values[i].dispatchOutFlowRate;
 				// // works (?): corrects both trends and occupancies with delay
 				// stock.values[i].dispatchOutFlowRate =+ netInFlowRate>=0 ? dispatchWeight * netInFlowRate : 0;
 				// stock.values[i].dispatchInFlowRate =+ netInFlowRate>=0 ? 0 : -(netInFlowRate/allDiff) * dispatchedBikesInTransit / dispatchDelay;
 
 				// // works (?): corrects only trends with delay
 				// var allNegativeTrends =  d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){ return d.stats.trend>=0 ? 0 : d.stats.trend});
-				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? dispatchWeight * stock.stats.trend * stock.values[i].userInFlowRate : 0;
+				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? dispatchWeight * stock.stats.trend * stock.values[i].inFlows_full : 0;
 				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? 0 :  (stock.stats.trend/allNegativeTrends) * dispatchedBikesInTransit / dispatchDelay;
 
 				// works: corrects both trends and occupancies
@@ -1223,12 +1192,12 @@ function correctDynamics(stocks, dispatchWeight, dispatchDelay){
 				// stock.values[i].dispatchInFlowRate =+ netInFlowRate>=0 ? 0 : -dispatchWeight *netInFlowRate;
 
 				// // works: corrects only trends
-				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? dispatchWeight * stock.stats.trend * stock.values[i].userInFlowRate : 0;
-				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? 0 : - dispatchWeight * stock.stats.trend * stock.values[i].userOutFlowRate;
+				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? dispatchWeight * stock.stats.trend * stock.values[i].inFlows_full : 0;
+				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? 0 : - dispatchWeight * stock.stats.trend * stock.values[i].outFlows_full;
 
 				// works: corrects only occupancies
-				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? (1-stock.stats.trend) * stock.values[i].userInFlowRate : stock.values[i].userInFlowRate;
-				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? stock.values[i].userOutFlowRate : (1+stock.stats.trend) * stock.values[i].userOutFlowRate;
+				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? (1-stock.stats.trend) * stock.values[i].inFlows_full : stock.values[i].inFlows_full;
+				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? stock.values[i].outFlows_full : (1+stock.stats.trend) * stock.values[i].outFlows_full;
 			}
 			if(stock.type=="dispatched"){
 				stock.values[i].dispatchInFlowRate = d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){return d.values[i].dispatchOutFlowRate});
@@ -1288,25 +1257,25 @@ function computeDynamicsFromTrips(trips, stocks, timeStep, timeRange){
 				stock.values[i].bikes = stock.initial;
 				stock.values[i].bikesUncorrected = stock.initial;
 			} else {
-				stock.values[i].bikes = stock.values[i-1].bikes - stock.values[i-1].userOutFlowRate + stock.values[i-1].userInFlowRate - stock.values[i-1].dispatchOutFlowRate + stock.values[i-1].dispatchInFlowRate;
-				stock.values[i].bikesUncorrected = stock.values[i-1].bikesUncorrected - stock.values[i-1].userOutFlowRate + stock.values[i-1].userInFlowRate;
+				stock.values[i].bikes = stock.values[i-1].bikes - stock.values[i-1].outFlows_full + stock.values[i-1].inFlows_full - stock.values[i-1].dispatchOutFlowRate + stock.values[i-1].dispatchInFlowRate;
+				stock.values[i].bikesUncorrected = stock.values[i-1].bikesUncorrected - stock.values[i-1].outFlows_full + stock.values[i-1].inFlows_full;
 			}
-			stock.values[i].userOutFlowRate = stock.values[i].outgoing_full_trips.length;
-			stock.values[i].userInFlowRate = stock.values[i].incoming_full_trips.length;
+			stock.values[i].outFlows_full = stock.values[i].outgoing_full_trips.length;
+			stock.values[i].inFlows_full = stock.values[i].incoming_full_trips.length;
 			stock.values[i].dispatchInFlowRate = stock.values[i].incoming_empty_trips.length;
 			stock.values[i].dispatchOutFlowRate = stock.values[i].outgoing_empty_trips.length;
 		});
 		//Careful: do not put allDiff inside the stocks.forEach loop because it will keep changing on every loop step
 		// The allDiff refers to the all differences that stocks had in the previous timestep
 		var allDiff =  d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){
-			var diff2 = d.values[i].userInFlowRate-d.values[i].userOutFlowRate + d.values[i].dispatchInFlowRate-d.values[i].dispatchOutFlowRate;
+			var diff2 = d.values[i].inFlows_full-d.values[i].outFlows_full + d.values[i].dispatchInFlowRate-d.values[i].dispatchOutFlowRate;
 			return diff2>=0 ? 0 : -diff2;
 		});
 		var dispatchedBikesInTransit = stocks.filter(function(d){return d.type=="dispatched"})[0].values[i].bikes;
 		var timeStepsDelay = 1;
 		stocks.forEach(function(stock){
 			if(stock.type=="station"){
-				var diff = stock.values[i].userInFlowRate-stock.values[i].userOutFlowRate + stock.values[i].dispatchInFlowRate-stock.values[i].dispatchOutFlowRate;
+				var diff = stock.values[i].inFlows_full-stock.values[i].outFlows_full + stock.values[i].dispatchInFlowRate-stock.values[i].dispatchOutFlowRate;
 				stock.values[i].dispatchOutFlowRate =+ diff>=0 ? diff : 0;
 				stock.values[i].dispatchInFlowRate =+ diff>=0 ? 0 : -(diff/allDiff) * dispatchedBikesInTransit / timeStepsDelay;
 				// stock.values[i].dispatchInFlowRate =+ diff<0 ? -diff : 0;
@@ -1328,10 +1297,10 @@ function computeDynamicsFromTrips(trips, stocks, timeStep, timeRange){
 function seasonalTrendDecomposition(stocks){
 	console.log("decomposing trend and seasonality...");
 	stocks.filter(function(d){return d.type=="station"}).forEach(function(d){
-		d.values.forEach(function(tStep){ tStep.trendInFlowRate= d.stats.trend>=0 ? d.stats.trend * tStep.userInFlowRate : 0;	});
-		d.values.forEach(function(tStep){ tStep.trendOutFlowRate= d.stats.trend>=0 ? 0 : - d.stats.trend * tStep.userOutFlowRate;});
-		d.values.forEach(function(tStep){ tStep.seasonalInFlowRate= d.stats.trend>=0 ? (1-d.stats.trend) * tStep.userInFlowRate : tStep.userInFlowRate;	});
-		d.values.forEach(function(tStep){ tStep.seasonalOutFlowRate= d.stats.trend>=0 ? tStep.userOutFlowRate : (1+ d.stats.trend) * tStep.userOutFlowRate; });
+		d.values.forEach(function(tStep){ tStep.trendInFlowRate= d.stats.trend>=0 ? d.stats.trend * tStep.inFlows_full : 0;	});
+		d.values.forEach(function(tStep){ tStep.trendOutFlowRate= d.stats.trend>=0 ? 0 : - d.stats.trend * tStep.outFlows_full;});
+		d.values.forEach(function(tStep){ tStep.seasonalInFlowRate= d.stats.trend>=0 ? (1-d.stats.trend) * tStep.inFlows_full : tStep.inFlows_full;	});
+		d.values.forEach(function(tStep){ tStep.seasonalOutFlowRate= d.stats.trend>=0 ? tStep.outFlows_full : (1+ d.stats.trend) * tStep.outFlows_full; });
 
 		d.values.forEach(function(tStep,i){
 			if (i==0){
