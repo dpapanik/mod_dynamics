@@ -74,14 +74,11 @@ function initialize(trips,timeRange){
 	addBundledTrips(stocks, trips, timeRange);
 
 	var flowRates = getFlowRates(stocks);
-
-	var levels = integrateLevels(flowRates);
+	var levels = setLevels(flowRates);
 
 
 	addStats(stocks);
- // correctDynamics(stocks, 1, 1);
-	// setDomains_v3(stocks);
-	// setMarginalLevels(stocks);
+	// setDomains(stocks);
 	stocks.sort(sortC); //.sort(sortA)
 	// d3.shuffle(stocks);
 
@@ -241,9 +238,9 @@ function addBundledTrips(stocks, trips, timeRange){
 }
 
 /******* Get Flow Rates *******/
-function getFlowRates(BundledTrips){
+function getFlowRates(bundledTrips){
 	console.log("making flow rates...");
-  return BundledTrips.map(function(stock){
+  return bundledTrips.map(function(stock){
     return{
       id : stock.id,
       name : stock.name,
@@ -423,11 +420,12 @@ function getTrendFlowRates(flowRates){
 	return result;
 }
 
-/****** Integrate Levels ******/
-function integrateLevels(stocks, domains){
+/****** Set Levels ******/
+function setLevels(stocks, initials){
 	for (var i=0; i<stocks[0].values.length; i++){
 		stocks.forEach(function(d, k){
-			d.level = d.initial + d3.sum(d.values.slice(0,i+1), function(tStep){
+			var initial = initials? initials[k] : d.initial;
+			d.level = initial + d3.sum(d.values.slice(0,i+1), function(tStep){
 				return tStep.inFlows_full + tStep.inFlows_empty - tStep.outFlows_full - tStep.outFlows_empty;
 			});
 		});
@@ -436,19 +434,19 @@ function integrateLevels(stocks, domains){
 }
 
 /****** Get Levels ******/
-function getLevels(flowRates, domains){
-	return flowRates.map(function(d){
+function getLevels(flowRates, initials){
+	return flowRates.map(function(d,k){
 		var result = {};
 		Object.keys(d).forEach(key =>	result[key] = d[key]);
 		result.values.forEach(function(entry,i){
-			entry.level = d.initial + d3.sum(d.values.slice(0,i+1), function(tStep){
+			var initial = initials? initials[k] : d.initial;
+			entry.level = initial + d3.sum(d.values.slice(0,i+1), function(tStep){
 				return tStep.inFlows_full + tStep.inFlows_empty - tStep.outFlows_full - tStep.outFlows_empty;
 			});
 		})
 		return result;
 	});
 }
-
 
 /********   Set Domains    *******/
 function setDomains(stocks){
@@ -465,11 +463,13 @@ function setDomains(stocks){
 }
 
 /********   Set Minimum Initials    *******/
-function getStocksWithMinimumInitials(stocks){
+function getMinimumInitials(stocks){
 	return stocks.map(function(d){
-		d.initial = d.initial - d.domains.level[0];
-		return d;
+		return d.initial - d.domains.level[0];
 	})
+}
+function getMinimumInitial(stock){
+	return stock.initial - stock.domains.level[0];
 }
 
 /*********   Add Stats   *********/
@@ -561,105 +561,6 @@ function addStats(stocks){
 /********** NOT IN USE BUT GOOD TO HAVE **********/
 
 
-/*********   System Setup  *********/
-/****** Get Stocks & Vehicles ******/
-/****** Get Stocks & Vehicles ******/
-
-function getStationsAndVehiclesFromTrips(trips, timeRange){
-	var stations = [];
-	var vehicles = [];
-	var indexByStationName = d3.map();
-	var stationNameByIndex = d3.map();
-	var indexByVehicleID = d3.map();
-	var vehicleIDByIndex = d3.map();
-	var n = 0;
-	var k = 0;
-	trips.forEach(function(trip) {
-		if (!indexByStationName.has(trip.start_station)) {
-			stations.push({
-				station_id : trip.start_station,
-				station_name : trip.start_station_name,
-				lat : trip.start_station_lat,
-				lng : trip.start_station_lng,
-				initial: 0
-			});
-			stationNameByIndex.set(n, trip.start_station);
-			indexByStationName.set(trip.start_station, n++);
-		}
-		if (!indexByStationName.has(trip.end_station)) {
-			stations.push({
-				station_id : trip.end_station,
-				station_name : trip.end_station_name,
-				lat : trip.end_station_lat,
-				lng : trip.end_station_lng,
-				initial: 0
-			});
-			stationNameByIndex.set(n, trip.end_station);
-			indexByStationName.set(trip.end_station, n++);
-		}
-		if (!indexByVehicleID.has(trip.bikeid)) {
-			vehicles.push({
-				vehicle_id : trip.bikeid
-			});
-			vehicleIDByIndex.set(k, trip.bikeid);
-			indexByVehicleID.set(trip.bikeid, k++);
-			stations[indexByStationName.get(trip.start_station)].initial++;
-
-		}
-		if(trip.start_date<=timeRange[0]){
-			if(trip.type=="full") inTransit_initial++;
-			if(trip.type=="empty") dispatched_initial++;
-		}
-	});
-	return {
-		stations: stations,
-		vehicles: vehicles,
-		inTransit_initial: inTransit_initial,
-		dispatched_initial: dispatched_initial
-	}
-}
-function makeStocksFromLocations(stations_and_vehicles){
-	console.log("making stocks from locations...");
-
-	var stocks = [];
-
-	//Compute stationary stocks
-	stations_and_vehicles.stations.forEach(function(station){
-		var result = {};
-		result.type = 'station';
-		result.lat = station.lat;
-		result.lng = station.lng;
-		result.name = station.station_name;
-		result.id = station.station_id;
-		result.initial = station.initial;
-		result.stackOrder = 10;
-		result.values = [];
-		stocks.push(result);
-	});
-
-	//Compute dispatched stocks
-	var dispatchStock = {};
-	dispatchStock.type = 'dispatched';
-	dispatchStock.name = "dispatched";
-	dispatchStock.id = 'dispatched';
-	dispatchStock.initial = stations_and_vehicles.dispatched_initial;
-	dispatchStock.stackOrder = 1;
-	dispatchStock.values = [];
-	stocks.push(dispatchStock);
-
-	//Compute transitionary stocks
-	var transitionalStock = {};
-	transitionalStock.type = 'inTransit';
-	transitionalStock.name = "InTransit";
-	transitionalStock.id = 'inTransit';
-	transitionalStock.initial = stations_and_vehicles.inTransit_initial;
-	transitionalStock.stackOrder = 0;
-	transitionalStock.values = [];
-	stocks.push(transitionalStock);
-
-	return stocks;
-}
-
 // Gets stocks and initializes levels at stocks, without and with D3
 function getStocks(trips, timeRange){
 	var stocks = [];
@@ -719,271 +620,6 @@ function getStocks(trips, timeRange){
 		}
 	});
 	return stocks;
-}
-function getStocksD3(trips, timeRange){
-	var stocks = [];
-	var indexByLocation = d3.map();
-	var indexByVehicleID = d3.map();
-	var n = 0;
-	var k = 0;
-
-  stocks.push({
-    type  : 'inTransit',
-    name  : 'inTransit',
-    id    : 'inTransit',
-    initial: 0,
-    stackOrder: 0,
-    values : []
-  });
-	indexByLocation.set('inTransit', n++);
-  stocks.push({
-    type  : 'dispatched',
-    name  : 'dispatched',
-    id    : 'dispatched',
-    initial: 0,
-    stackOrder: 1,
-    values : []
-  });
-	indexByLocation.set('dispatched', n++);
-	trips.forEach(function(trip) {
-    if (!indexByLocation.has(trip.start_station)) {
-      stocks.push({
-        type  : 'station',
-        name  : trip.start_station_name,
-        id    : trip.start_station,
-        lat   : trip.start_station_lat,
-        lng   : trip.start_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-      indexByLocation.set(trip.start_station, n++);
-    }
-    if (!indexByLocation.has(trip.end_station)){
-      stocks.push({
-        type  : 'station',
-        name  : trip.end_station_name,
-        id    : trip.end_station,
-        lat   : trip.end_station_lat,
-        lng   : trip.end_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-      indexByLocation.set(trip.end_station, n++);
-    }
-		// INITIALIZE locational stocks
-		if (!indexByVehicleID.has(trip.bikeid)) {
-			indexByVehicleID.set(trip.bikeid, k++);
-			stocks[indexByLocation.get(trip.start_station)].initial++;
-		}
-		// INITIALIZE inTransit & dispatched stocks
-		if(trip.start_date<=timeRange[0]){
-			if(trip.type=="full") stocks[indexByLocation.get('inTransit')].initial++;
-			if(trip.type=="empty") stocks[indexByLocation.get('dispatched')].initial++;
-		}
-	});
-
-	return stocks;
-}
-// Gets stocks, vehicles, and initializes levels at stocks, , without and with D3
-function currently_in_use_getStocksAndVehicles(trips, timeRange){
-	// Returns vehicles as objects
-	// Best one
-	var stocks = [];
-	var vehicles = [];
-
-  stocks.push({
-    type  : 'inTransit',
-    name  : 'inTransit',
-    id    : 'inTransit',
-    initial: 0,
-    stackOrder: 0,
-    values : []
-  });
-  stocks.push({
-    type  : 'dispatched',
-    name  : 'dispatched',
-    id    : 'dispatched',
-    initial: 0,
-    stackOrder: 1,
-    values : []
-  });
-	trips.forEach(function(trip) {
-    if (stocks.find(d => d.name==trip.start_station)==null) {
-      stocks.push({
-        type  : 'station',
-        name  : trip.start_station_name,
-        id    : trip.start_station,
-        lat   : trip.start_station_lat,
-        lng   : trip.start_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-    }
-    if (stocks.find(d => d.name==trip.end_station)==null){
-      stocks.push({
-        type  : 'station',
-        name  : trip.end_station_name,
-        id    : trip.end_station,
-        lat   : trip.end_station_lat,
-        lng   : trip.end_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-    }
-		if (vehicles.find(d => d.vehicle_id == trip.bikeid)==null) {
-			vehicles.push({vehicle_id : trip.bikeid});
-			stocks.find(d => d.name==trip.start_station).initial++;
-		}
-		if(trip.start_date<=timeRange[0]){
-			if(trip.type=="full") stocks.find(function(d){return d.name=='inTransit'}).initial++;
-			if(trip.type=="empty") stocks.find(function(d){return d.name=='dispatched'}).initial++;
-		}
-	});
-	return {
-		stocks: stocks,
-		vehicles: vehicles
-	}
-}
-function getStocksAndVehicleIDs(trips, timeRange){
-	// Returns vehicles as strings
-	var stocks = [];
-	var vehicles = [];
-
-  stocks.push({
-    type  : 'inTransit',
-    name  : 'inTransit',
-    id    : 'inTransit',
-    initial: 0,
-    stackOrder: 0,
-    values : []
-  });
-  stocks.push({
-    type  : 'dispatched',
-    name  : 'dispatched',
-    id    : 'dispatched',
-    initial: 0,
-    stackOrder: 1,
-    values : []
-  });
-	trips.forEach(function(trip) {
-    if (stocks.find(function(d){return d.name==trip.start_station })==null) {
-      stocks.push({
-        type  : 'station',
-        name  : trip.start_station_name,
-        id    : trip.start_station,
-        lat   : trip.start_station_lat,
-        lng   : trip.start_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-    }
-    if (stocks.find(function(d){return d.name==trip.end_station })==null){
-      stocks.push({
-        type  : 'station',
-        name  : trip.end_station_name,
-        id    : trip.end_station,
-        lat   : trip.end_station_lat,
-        lng   : trip.end_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-    }
-		// INITIALIZE locational stocks
-		if (!vehicles.includes(trip.bikeid)) {
-			vehicles.push(trip.bikeid);
-			stocks.find(function(d){return d.name==trip.start_station }).initial++;
-		}
-		// INITIALIZE inTransit & dispatched stocks
-		if(trip.start_date<=timeRange[0]){
-			if(trip.type=="full") stocks.find(function(d){return d.name=='inTransit'}).initial++;
-			if(trip.type=="empty") stocks.find(function(d){return d.name=='dispatched'}).initial++;
-		}
-	});
-	return {
-		stocks: stocks,
-		vehicles: vehicles
-	}
-}
-function getStocksAndVehiclesD3(trips, timeRange){
-	// Returns vehicles as objects
-	// Uses d3.map() function
-	var stocks = [];
-	var vehicles = [];
-	var indexByLocation = d3.map();
-	var indexByVehicleID = d3.map();
-	var n = 0;
-	var k = 0;
-
-  stocks.push({
-    type  : 'inTransit',
-    name  : 'inTransit',
-    id    : 'inTransit',
-    initial: 0,
-    stackOrder: 0,
-    values : []
-  });
-	indexByLocation.set('inTransit', n++);
-  stocks.push({
-    type  : 'dispatched',
-    name  : 'dispatched',
-    id    : 'dispatched',
-    initial: 0,
-    stackOrder: 1,
-    values : []
-  });
-	indexByLocation.set('dispatched', n++);
-	trips.forEach(function(trip) {
-		if (!indexByLocation.has(trip.start_station)) {
-      stocks.push({
-        type  : 'station',
-        name  : trip.start_station_name,
-        id    : trip.start_station,
-        lat   : trip.start_station_lat,
-        lng   : trip.start_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-      indexByLocation.set(trip.start_station, n++);
-    }
-    if (!indexByLocation.has(trip.end_station)){
-      stocks.push({
-        type  : 'station',
-        name  : trip.end_station_name,
-        id    : trip.end_station,
-        lat   : trip.end_station_lat,
-        lng   : trip.end_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-      indexByLocation.set(trip.end_station, n++);
-    }
-		// INITIALIZE locational stocks
-		if (!indexByVehicleID.has(trip.bikeid)) {
-			vehicles.push({
-				vehicle_id : trip.bikeid
-			});
-			indexByVehicleID.set(trip.bikeid, k++);
-			stocks[indexByLocation.get(trip.start_station)].initial++;
-		}
-		// INITIALIZE inTransit & dispatched stocks
-		if(trip.start_date<=timeRange[0]){
-			if(trip.type=="full") stocks[indexByLocation.get('inTransit')].initial++;
-			if(trip.type=="empty") stocks[indexByLocation.get('dispatched')].initial++;
-		}
-	});
-
-	return {
-		stocks: stocks,
-		vehicles: vehicles
-	}
 }
 
 // Or each one individually:
@@ -1075,14 +711,6 @@ function setInitialLevels(trips, stocks, timeRange){
 		}
 	});
 }
-
-
-
-
-
-
-
-
 
 
 // In Progress
