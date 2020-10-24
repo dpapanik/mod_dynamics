@@ -59,7 +59,7 @@ function initialize(trips,timeRange){
 	var stocks = stocksAndVehicles.stocks;
 	var vehicles = stocksAndVehicles.vehicles;
 
-	addBundledTrips(stocks, trips, timeRange);
+	stocks = addBundledTrips(stocks, trips, timeRange);
 
 	var flowRates = getFlowRates(stocks);
 	var levels = setLevels(flowRates);
@@ -189,8 +189,8 @@ function getStocksAndVehicles(trips, timeRange){
 	}
 }
 
-/****** Add Bundled Trips ******/
-function addBundledTrips(stocks, trips, timeRange){
+/****** Set Bundled Trips ******/
+function setBundledTrips(stocks, trips, timeRange){
 	console.log("bundling trips...");
 	var timeStep = timeRange[1] - timeRange[0];
 	timeRange.forEach(function(tStep,i){
@@ -218,10 +218,51 @@ function addBundledTrips(stocks, trips, timeRange){
 				historyEntry.trips_incoming_empty = [];
 				historyEntry.trips_outgoing_empty = [];
 			}
-			stock.values.push(historyEntry);
+			stock.values[i] = historyEntry;
 		})
 	})
 	return stocks;
+}
+
+/****** Get Bundled Trips ******/
+function getBundledTrips(stocks, trips, timeRange){
+	console.log("bundling trips...");
+	var bundledTrips = stocks.map(function(d){
+		var bundle = {};
+		for (p in d) bundle[p]=d[p];
+		bundle.values = [];
+		return bundle;
+	});
+	var timeStep = timeRange[1] - timeRange[0];
+	timeRange.forEach(function(tStep,i){
+		var tStepTrips = trips.filter(function(trip){return (trip.start_date>=tStep && trip.start_date < new Date(+tStep + timeStep) || (trip.end_date>=tStep && trip.end_date < new Date(+tStep + timeStep)) )});
+		var incoming_tStepTrips = tStepTrips.filter(function(trip){return trip.end_date < new Date(+tStep + timeStep) });
+		var outgoing_tStepTrips = tStepTrips.filter(function(trip){return trip.start_date>=tStep });
+		bundledTrips.forEach(function(bundle){
+			var historyEntry = {};
+			historyEntry.date = tStep;
+			if (bundle.type=="station"){
+				historyEntry.trips_incoming_full = incoming_tStepTrips.filter(function(trip){return trip.end_station==bundle.id && trip.type=="full" });
+				historyEntry.trips_outgoing_full = outgoing_tStepTrips.filter(function(trip){return trip.start_station==bundle.id &&  trip.type=="full" });
+				historyEntry.trips_incoming_empty = incoming_tStepTrips.filter(function(trip){return trip.end_station==bundle.id && trip.type=="empty" });
+				historyEntry.trips_outgoing_empty = outgoing_tStepTrips.filter(function(trip){return trip.start_station==bundle.id &&  trip.type=="empty" });
+			}
+			if (bundle.type=="dispatched"){
+				historyEntry.trips_incoming_full = [];
+				historyEntry.trips_outgoing_full = [];
+				historyEntry.trips_incoming_empty = outgoing_tStepTrips.filter(function(trip){return trip.type=="empty" });
+				historyEntry.trips_outgoing_empty = incoming_tStepTrips.filter(function(trip){return trip.type=="empty" });
+			}
+			if (bundle.type=="inTransit"){
+				historyEntry.trips_incoming_full = outgoing_tStepTrips.filter(function(trip){return trip.type=="full" });
+				historyEntry.trips_outgoing_full = incoming_tStepTrips.filter(function(trip){return trip.type=="full" });
+				historyEntry.trips_incoming_empty = [];
+				historyEntry.trips_outgoing_empty = [];
+			}
+			bundle.values[i] = historyEntry;
+		})
+	})
+	return bundledTrips;
 }
 
 /******* Get Flow Rates *******/
