@@ -740,3 +740,21 @@ function correctDynamics(stocks, dispatchWeight, dispatchDelay){
 	}
 	return stocks;
 }
+
+
+
+// GET LEVELS WORKS THE SAME AS SETLEVELS - PROBLEM!!!!!!!
+function getLevels_OLD(flowRates, initials){
+	return flowRates.map(function(d,k){
+		var result = {};
+		Object.keys(d).forEach(key =>	result[key] = d[key]);
+		// for (pname in d) result[pname]=d[pname]; // copy properties
+		result.values.forEach(function(entry,i){
+			var initial = initials? initials[k] : d.initial;
+			entry.level = initial + d3.sum(d.values.slice(0,i+1), function(tStep){
+				return tStep.inFlows_full + tStep.inFlows_empty - tStep.outFlows_full - tStep.outFlows_empty;
+			});
+		})
+		return result;
+	});
+}
