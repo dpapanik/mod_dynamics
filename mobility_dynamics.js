@@ -1,4 +1,4 @@
-// Last Update: Oct 15, 2020
+// Last Update: Oct 26, 2020
 // © Dimitris Papanikolaou
 
 var d3 = require("d3");
@@ -574,8 +574,6 @@ function getFlowRateTrends(stock){
 		trend_empty: trend_empty
 	}
 }
-
-
 
 
 /*********   Module Exports   *********/
