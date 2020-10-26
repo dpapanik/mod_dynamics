@@ -1,80 +1,49 @@
 // Last Update: Oct 15, 2020
 // © Dimitris Papanikolaou
-// This code first creates inFlows and outFlows, then it decomposes inFlows and outFlows into trend and seasonality flows, and then it integrates levels
 
-/***** SIMPLER VERSION ******/
-/***** SIMPLER VERSION ******/
-/***** SIMPLER VERSION ******/
-/***** SIMPLER VERSION ******/
-/***** SIMPLER VERSION ******/
-
-
-// This version assumes that combined trips are computed before hand and not as part of initialize.
-// trips: array of trip JSON objects. Each trip JSON object consists of the following attributes:
-// trip = {
-// 	id : integer,
-// 	duration : integer (seconds),
-// 	start_date : Date object,
-// 	end_date : Date object,
-// 	start_station : String or integer,
-// 	start_station_name : String,
-// 	start_station_lat : number,
-// 	start_station_lng : number,
-// 	end_station : String or integer,
-// 	end_station_name : String,
-// 	end_station_lat : number,
-// 	end_station_lng : number,
-// 	bikeid : String,
-// 	trip_id : String,
-// 	type : "full"
-// }
-
-
-/***	GLOBAL VARIABLES	 ***/
-/***	GLOBAL VARIABLES	 ***/
-/***	GLOBAL VARIABLES	 ***/
-
-var timeFormat = d3.time.format("%H:%M:%S");
-var dateFormat = d3.time.format("%m/%d/%Y");
-var dateTimeFormat = d3.time.format("%m/%d/%y %H:%M");
-var startComputingTime = Date.now();
-
-var startDate = d3.time.format("%Y-%m-%d").parse("2019-06-17");
-var endDate = d3.time.format("%Y-%m-%d").parse("2019-06-18");
-var timerange = d3.time.minutes(startDate, endDate, 15);
-//Create a range of timesteps (in minutes) that will be used to create the bins for sampling stationEvents to create the accumulation dynamics
-// minutesRange = d3.time.minutes(startDate, endDate, timeStep);
-// minutesRange.filter(function(d){return (d.getDay() == "0" || d.getDay() == "6") ;})
-
-
+var d3 = require("d3");
 
 /***	FUNCTIONS	***/
 /***	FUNCTIONS	***/
 /***	FUNCTIONS	***/
 
-// Function initialize gets a user trip dataset and a desired timestep as inputs, and it returns a JSON object that contains the reconstructed accumulation dynamics time series data as an output
-function initialize(trips,timeRange){
+// Function getDynamics gets a user trip dataset and a desired timestep as inputs, and
+// it returns a JSON object that contains the reconstructed accumulation dynamics time series data as an output
+function getDynamics(trips,timeRange){
 
 	var stocksAndVehicles = getStocksAndVehicles(trips, timeRange);
 	var stocks = stocksAndVehicles.stocks;
 	var vehicles = stocksAndVehicles.vehicles;
 
-	stocks = setBundledTrips(stocks, trips, timeRange);
+	var bundledTrips = getBundledTrips(stocks, trips, timeRange);
 
-	var flowRates = getFlowRates(stocks);
-	var levels = setLevels(flowRates);
+	var flowRates = getFlowRates(bundledTrips);
+	var seasonalFlowRates = getSeasonalFlowRates(flowRates);
+	var trendFlowRates = getTrendFlowRates(flowRates);
+
+	var levels = getLevels(flowRates);
+	var seasonalLevels = getLevels(seasonalFlowRates);
+	var trendLevels = getLevels(trendFlowRates);
+
+	setDomains(levels);
+	setDomains(seasonalLevels);
+	setDomains(trendLevels);
 
 	addStats(stocks);
-	// setDomains(stocks);
+
 	stocks.sort(sortC); //.sort(sortA)
 	// d3.shuffle(stocks);
 
-	console.log("Total computing time: " + (Date.now() - startComputingTime)/1000 + "seconds" );
-	return {stocks: stocks, trips: trips, vehicles: vehicles};
+	return {
+		stocks: levels,
+		seasonalStocks: seasonalLevels,
+		trendStocks: trendLevels,
+		trips: trips,
+		vehicles: vehicles
+	};
 }
 
 
-/****** SORTING ALGORITHMS ******/
 /****** SORTING ALGORITHMS ******/
 function sortA(a,b){
 	if ( !(a.type=='station' && b.type=='station') ) {
@@ -125,7 +94,6 @@ function sortD(a,b){
 /****** Get Stocks & Vehicles ******/
 function getStocksAndVehicles(trips, timeRange){
 	// Returns vehicles as objects
-	// Best one
 	var stocks = [];
 	var vehicles = [];
 
@@ -298,9 +266,9 @@ function getSeasonalFlowRates(flowRates){
 		var inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
 		var outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
 		var trend = inFlows_full_sum==0 && outFlows_full_sum==0? 0 : (inFlows_full_sum-outFlows_full_sum)/Math.max(inFlows_full_sum,outFlows_full_sum);
-		var empty_inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
-		var empty_outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
-		var empty_trend = empty_inFlows_full_sum==0 && empty_outFlows_full_sum==0? 0 : (empty_inFlows_full_sum-empty_outFlows_full_sum)/Math.max(empty_inFlows_full_sum,empty_outFlows_full_sum);
+		var inFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
+		var outFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
+		var trend_empty = inFlows_empty_sum==0 && outFlows_empty_sum==0? 0 : (inFlows_empty_sum-outFlows_empty_sum)/Math.max(inFlows_empty_sum,outFlows_empty_sum);
 
 		result.push({
 			id : d.id,
@@ -313,9 +281,9 @@ function getSeasonalFlowRates(flowRates){
 				return {
 					date : tStep.date,
 					inFlows_full : trend>=0 ? (1-trend) * tStep.inFlows_full : tStep.inFlows_full,
-					inFlows_empty : empty_trend>=0 ? (1-empty_trend) * tStep.inFlows_empty : tStep.inFlows_empty,
+					inFlows_empty : trend_empty>=0 ? (1-trend_empty) * tStep.inFlows_empty : tStep.inFlows_empty,
 					outFlows_full : trend>=0 ? tStep.outFlows_full : (1+ trend) * tStep.outFlows_full,
-					outFlows_empty : empty_trend>=0 ? tStep.outFlows_empty : (1+ empty_trend) * tStep.outFlows_empty
+					outFlows_empty : trend_empty>=0 ? tStep.outFlows_empty : (1+ trend_empty) * tStep.outFlows_empty
 					}
 				})
 			})
@@ -377,9 +345,9 @@ function getTrendFlowRates(flowRates){
 		var inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
 		var outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
 		var trend = inFlows_full_sum==0 && outFlows_full_sum==0? 0 : (inFlows_full_sum-outFlows_full_sum)/Math.max(inFlows_full_sum,outFlows_full_sum);
-		var empty_inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
-		var empty_outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
-		var empty_trend = empty_inFlows_full_sum==0 && empty_outFlows_full_sum==0? 0 : (empty_inFlows_full_sum-empty_outFlows_full_sum)/Math.max(empty_inFlows_full_sum,empty_outFlows_full_sum);
+		var inFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
+		var outFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
+		var trend_empty = inFlows_empty_sum==0 && outFlows_empty_sum==0? 0 : (inFlows_empty_sum-outFlows_empty_sum)/Math.max(inFlows_empty_sum,outFlows_empty_sum);
 
 		result.push({
 			id : d.id,
@@ -392,9 +360,9 @@ function getTrendFlowRates(flowRates){
 				return {
 					date : tStep.date,
           inFlows_full : trend>=0 ? trend * tStep.inFlows_full : 0,
-          inFlows_empty : empty_trend>=0 ? empty_trend * tStep.inFlows_empty : 0,
+          inFlows_empty : trend_empty>=0 ? trend_empty * tStep.inFlows_empty : 0,
           outFlows_full : trend>=0 ? 0 : - trend * tStep.outFlows_full,
-          outFlows_empty : empty_trend>=0 ? 0 : - empty_trend * tStep.outFlows_empty
+          outFlows_empty : trend_empty>=0 ? 0 : - trend_empty * tStep.outFlows_empty
 				}
 			})
 		});
@@ -593,12 +561,29 @@ function averageValues(stocks){
   return avgStocks;
 }
 
+/*********   Get Flow Rate Trends   *********/
+function getFlowRateTrends(stock){
+	var inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
+	var outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
+	var trend = inFlows_full_sum==0 && outFlows_full_sum==0? 0 : (inFlows_full_sum-outFlows_full_sum)/Math.max(inFlows_full_sum,outFlows_full_sum);
+	var inFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
+	var outFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
+	var trend_empty = inFlows_empty_sum==0 && outFlows_empty_sum==0? 0 : (inFlows_empty_sum-outFlows_empty_sum)/Math.max(inFlows_empty_sum,outFlows_empty_sum);
+	return {
+		trend: trend,
+		trend_empty: trend_empty
+	}
+}
+
+
+
 
 /*********   Module Exports   *********/
-module.exports.initialize= initialize;
+module.exports.getDynamics= getDynamics;
 module.exports.sortA= sortA;
 module.exports.getStocksAndVehicles= getStocksAndVehicles;
-module.exports.addBundledTrips= addBundledTrips;
+module.exports.setBundledTrips= setBundledTrips;
+module.exports.getBundledTrips= getBundledTrips;
 module.exports.getFlowRates= getFlowRates;
 module.exports.getSeasonalFlowRates= getSeasonalFlowRates;
 module.exports.getTrendFlowRates= getTrendFlowRates;
@@ -610,296 +595,3 @@ module.exports.getMinimumInitials= getMinimumInitials;
 module.exports.getMinimumInitial= getMinimumInitial;
 module.exports.addStats= addStats;
 module.exports.averageValues= averageValues;
-
-
-
-
-
-
-/********** NOT IN USE BUT GOOD TO HAVE **********/
-/********** NOT IN USE BUT GOOD TO HAVE **********/
-/********** NOT IN USE BUT GOOD TO HAVE **********/
-/********** NOT IN USE BUT GOOD TO HAVE **********/
-/********** NOT IN USE BUT GOOD TO HAVE **********/
-
-
-function getStocks(trips, timeRange){
-	var stocks = [];
-	var vehicleIDs = [];
-  stocks.push({
-    type  : 'inTransit',
-    name  : 'inTransit',
-    id    : 'inTransit',
-    initial: 0,
-    stackOrder: 0,
-    values : []
-  });
-  stocks.push({
-    type  : 'dispatched',
-    name  : 'dispatched',
-    id    : 'dispatched',
-    initial: 0,
-    stackOrder: 1,
-    values : []
-  });
-	trips.forEach(function(trip) {
-    if (stocks.find(function(d){return d.name==trip.start_station })==null) {
-      stocks.push({
-        type  : 'station',
-        name  : trip.start_station_name,
-        id    : trip.start_station,
-        lat   : trip.start_station_lat,
-        lng   : trip.start_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-			vehicleIDs.push(trip.bikeid);
-    }
-    if (stocks.find(function(d){return d.name==trip.end_station })==null){
-      stocks.push({
-        type  : 'station',
-        name  : trip.end_station_name,
-        id    : trip.end_station,
-        lat   : trip.end_station_lat,
-        lng   : trip.end_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-			vehicleIDs.push(trip.bikeid);
-    }
-		// INITIALIZE locational stocks
-		if (!vehicleIDs.includes(trip.bikeid)) {
-			stocks.find(function(d){return d.name==trip.start_station }).initial++;
-		}
-		// INITIALIZE inTransit & dispatched stocks
-		if(trip.start_date<=timeRange[0]){
-			if(trip.type=="full") stocks.find(function(d){return d.name=='inTransit'}).initial++;
-			if(trip.type=="empty") stocks.find(function(d){return d.name=='dispatched'}).initial++;
-		}
-	});
-	return stocks;
-}
-function getVehicleIDs(trips){
-	var vehicles = [];
-	trips.forEach(function(trip) {
-		if (!vehicles.includes(trip.bikeid)) {
-			vehicles.push(trip.bikeid);
-		}
-	});
-	return vehicles;
-}
-function getVehicles(trips){
-	var vehicles = [];
-	var vehicleIDs = new Set();
-	trips.forEach(function(trip) {
-		if (!vehicleIDs.has(trip.bikeid)) {
-			vehicles.push({
-				id : trip.bikeid,
-				type: 'vehicle'
-			});
-			vehicleIDs.add(trip.bikeid);
-		}
-	});
-	return vehicles;
-}
-function getStocksFromTrips(trips){
-	var stocks = [];
-	var stationIDs = new Set();
-  stocks.push({
-    type  : 'inTransit',
-    name  : 'inTransit',
-    id    : 'inTransit',
-    initial: 0,
-    stackOrder: 0,
-    values : []
-  });
-  stocks.push({
-    type  : 'dispatched',
-    name  : 'dispatched',
-    id    : 'dispatched',
-    initial: 0,
-    stackOrder: 1,
-    values : []
-  });
-	trips.forEach(function(trip) {
-		if (!stationIDs.has(trip.start_station)) {
-      stocks.push({
-        type  : 'station',
-        name  : trip.start_station_name,
-        id    : trip.start_station,
-        lat   : trip.start_station_lat,
-        lng   : trip.start_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-      stationIDs.add(trip.start_station);
-    }
-    if (!stationIDs.has(trip.end_station)){
-      stocks.push({
-        type  : 'station',
-        name  : trip.end_station_name,
-        id    : trip.end_station,
-        lat   : trip.end_station_lat,
-        lng   : trip.end_station_lng,
-        initial: 0,
-        stackOrder: 10,
-        values : []
-      });
-			stationIDs.add(trip.end_station);
-    }
-	});
-	return stocks;
-}
-function setInitialLevels(trips, stocks, timeRange){
-	var stockIDs = new Set();
-	var vehicleIDs = new Set();
-  stocks.forEach(function(stock){
-    stockIDs.add(stock.name);
-  });
-	trips.forEach(function(trip) {
-		if (!vehicleIDs.has(trip.bikeid)) {
-			vehicleIDs.add(trip.bikeid);
-			stocks.find(function(d){return d.name==trip.start_station }).initial++;
-		}
-		if(trip.start_date<=timeRange[0]){
-			if(trip.type=="full") stocks.find(function(d){return d.name=='inTransit'}).initial++;
-			if(trip.type=="empty") stocks.find(function(d){return d.name=='dispatched'}).initial++;
-		}
-	});
-}
-
-
-/********** IN PROGRESS **********/
-/********** IN PROGRESS **********/
-/********** IN PROGRESS **********/
-
-
-// Use this to average an array of stocks, e.g. the outcome of getDataPerDay(trips, startDate, endDate);
-function averageValuesStack(flowRates){
-	var averageFlowRates = flowRates[0].map(function(d,k){
-		var avgFlowRate = {};
-		for (p in d) avgFlowRate[p]=d[p];
-		avgFlowRate.values.forEach(function(entry,i){
-			entry.inFlows_full = d3.mean(flowRates.filter(function(d){return d.id == avgFlowRate.id}), function(d){return d.values[i].inFlows_full});
-			entry.outFlows_full = d3.mean(flowRates.filter(function(d){return d.id == avgFlowRate.id}), function(d){return d.values[i].outFlows_full});
-			entry.inFlows_empty = d3.mean(flowRates.filter(function(d){return d.id == avgFlowRate.id}), function(d){return d.values[i].inFlows_empty});
-			entry.outFlows_empty = d3.mean(flowRates.filter(function(d){return d.id == avgFlowRate.id}), function(d){return d.values[i].outFlows_empty});
-		})
-	})
-  return averageFlowRates;
-}
-
-
-function setCorrectionFlowRates(stocks){
-	console.log("making correction flow rates...");
-	stocks.filter(function(d){return d.type=="station"}).forEach(function(stock,k){
-		stock.values.forEach(function(tStep,i){
-			var allDispatchOutFlowRates = d3.sum(stocks, function(_stock){
-				if (_stock.type=="station"){
-					var diff = _stock.values[i].inFlows_full-_stock.values[i].outFlows_full;
-					if (diff>=0){
-						return diff;
-					} else {
-						return 0;
-					}
-				}
-			});
-			var allDispatchInFlowRatesDemand = d3.sum(stocks, function(_stock){
-				if (_stock.type=="station"){
-					var diff = _stock.values[i].inFlows_full-_stock.values[i].outFlows_full;
-					if (diff>=0){
-						return 0;
-					} else {
-						return -diff;
-					}
-				}
-			});
-
-			var diff = tStep.inFlows_full-tStep.outFlows_full;
-			if (diff>=0){
-				tStep.dispatchOutFlowRate = diff;
-				tStep.dispatchInFlowRate = 0;
-			} else {
-				tStep.dispatchOutFlowRate = 0;
-				tStep.dispatchInFlowRate =  -diff * (allDispatchOutFlowRates/allDispatchInFlowRatesDemand);
-			}
-		})
-	});
-	return stocks;
-}
-function correctDynamics(stocks, dispatchWeight, dispatchDelay){
-	// this function can be addedd after setFlowRatesFromTrips(trips, stocks, timeStep) and integrateLevelsFromFlowRates(vehicles, trips, stocks): it adds correction flows and re-integrates dynamics
-	console.log("correcting dynamics...");
-	for (var i=0; i<stocks[0].values.length; i++){
-		stocks.forEach(function(stock){
-			if (i==0){
-				stock.values[i].bikes = stock.initial;
-				stock.values[i].bikesUncorrected = stock.initial;
-			} else {
-				stock.values[i].bikes = stock.values[i-1].bikes - stock.values[i-1].outFlows_full + stock.values[i-1].inFlows_full - stock.values[i-1].dispatchOutFlowRate + stock.values[i-1].dispatchInFlowRate;
-				stock.values[i].bikesUncorrected = stock.values[i-1].bikesUncorrected - stock.values[i-1].outFlows_full + stock.values[i-1].inFlows_full;
-			}
-		});
-
-		var allDiff =  d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){
-			return -Math.min(0, d.values[i].inFlows_full-d.values[i].outFlows_full + d.values[i].dispatchInFlowRate-d.values[i].dispatchOutFlowRate);
-		});
-		var dispatchedBikesInTransit = stocks.filter(function(d){return d.type=="dispatched"})[0].values[i].bikes;
-
-		stocks.forEach(function(stock){
-			if(stock.type=="station"){
-				var netInFlowRate = stock.values[i].inFlows_full-stock.values[i].outFlows_full + stock.values[i].dispatchInFlowRate-stock.values[i].dispatchOutFlowRate;
-				// // works (?): corrects both trends and occupancies with delay
-				// stock.values[i].dispatchOutFlowRate =+ netInFlowRate>=0 ? dispatchWeight * netInFlowRate : 0;
-				// stock.values[i].dispatchInFlowRate =+ netInFlowRate>=0 ? 0 : -(netInFlowRate/allDiff) * dispatchedBikesInTransit / dispatchDelay;
-
-				// // works (?): corrects only trends with delay
-				// var allNegativeTrends =  d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){ return d.stats.trend>=0 ? 0 : d.stats.trend});
-				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? dispatchWeight * stock.stats.trend * stock.values[i].inFlows_full : 0;
-				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? 0 :  (stock.stats.trend/allNegativeTrends) * dispatchedBikesInTransit / dispatchDelay;
-
-				// works: corrects both trends and occupancies
-				// stock.values[i].dispatchOutFlowRate =+ netInFlowRate>=0 ? dispatchWeight * netInFlowRate : 0;
-				// stock.values[i].dispatchInFlowRate =+ netInFlowRate>=0 ? 0 : -dispatchWeight *netInFlowRate;
-
-				// // works: corrects only trends
-				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? dispatchWeight * stock.stats.trend * stock.values[i].inFlows_full : 0;
-				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? 0 : - dispatchWeight * stock.stats.trend * stock.values[i].outFlows_full;
-
-				// works: corrects only occupancies
-				// stock.values[i].dispatchOutFlowRate =+ stock.stats.trend>=0 ? (1-stock.stats.trend) * stock.values[i].inFlows_full : stock.values[i].inFlows_full;
-				// stock.values[i].dispatchInFlowRate =+ stock.stats.trend>=0 ? stock.values[i].outFlows_full : (1+stock.stats.trend) * stock.values[i].outFlows_full;
-			}
-			if(stock.type=="dispatched"){
-				stock.values[i].dispatchInFlowRate = d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){return d.values[i].dispatchOutFlowRate});
-				stock.values[i].dispatchOutFlowRate = d3.sum(stocks.filter(function(d){return d.type=="station"}), function(d){return d.values[i].dispatchInFlowRate});
-			}
-			if(stock.type=="inTransit"){
-				stock.values[i].dispatchInFlowRate = 0;
-				stock.values[i].dispatchOutFlowRate = 0;
-			}
-		});
-	}
-	return stocks;
-}
-
-
-
-// GET LEVELS WORKS THE SAME AS SETLEVELS - PROBLEM!!!!!!!
-function getLevels_OLD(flowRates, initials){
-	return flowRates.map(function(d,k){
-		var result = {};
-		Object.keys(d).forEach(key =>	result[key] = d[key]);
-		// for (pname in d) result[pname]=d[pname]; // copy properties
-		result.values.forEach(function(entry,i){
-			var initial = initials? initials[k] : d.initial;
-			entry.level = initial + d3.sum(d.values.slice(0,i+1), function(tStep){
-				return tStep.inFlows_full + tStep.inFlows_empty - tStep.outFlows_full - tStep.outFlows_empty;
-			});
-		})
-		return result;
-	});
-}
