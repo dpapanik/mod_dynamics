@@ -295,12 +295,12 @@ function getSeasonalFlowRates(flowRates){
 	var result = [];
 
 	flowRates.filter(function(d){return d.type=="station"}).map(function(d){
-		var inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
-		var outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
-		var trend = inFlows_full_sum==0 && outFlows_full_sum==0? 0 : (inFlows_full_sum-outFlows_full_sum)/Math.max(inFlows_full_sum,outFlows_full_sum);
-		var empty_inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
-		var empty_outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
-		var empty_trend = empty_inFlows_full_sum==0 && empty_outFlows_full_sum==0? 0 : (empty_inFlows_full_sum-empty_outFlows_full_sum)/Math.max(empty_inFlows_full_sum,empty_outFlows_full_sum);
+		var inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
+		var outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
+		var trend = inFlows_full_total==0 && outFlows_full_total==0? 0 : (inFlows_full_total-outFlows_full_total)/Math.max(inFlows_full_total,outFlows_full_total);
+		var empty_inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
+		var empty_outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
+		var empty_trend = empty_inFlows_full_total==0 && empty_outFlows_full_total==0? 0 : (empty_inFlows_full_total-empty_outFlows_full_total)/Math.max(empty_inFlows_full_total,empty_outFlows_full_total);
 
 		result.push({
 			id : d.id,
@@ -374,12 +374,12 @@ function getTrendFlowRates(flowRates){
 	var result = [];
 
 	flowRates.filter(function(d){return d.type=="station"}).map(function(d){
-		var inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
-		var outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
-		var trend = inFlows_full_sum==0 && outFlows_full_sum==0? 0 : (inFlows_full_sum-outFlows_full_sum)/Math.max(inFlows_full_sum,outFlows_full_sum);
-		var empty_inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
-		var empty_outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
-		var empty_trend = empty_inFlows_full_sum==0 && empty_outFlows_full_sum==0? 0 : (empty_inFlows_full_sum-empty_outFlows_full_sum)/Math.max(empty_inFlows_full_sum,empty_outFlows_full_sum);
+		var inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
+		var outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
+		var trend = inFlows_full_total==0 && outFlows_full_total==0? 0 : (inFlows_full_total-outFlows_full_total)/Math.max(inFlows_full_total,outFlows_full_total);
+		var empty_inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
+		var empty_outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
+		var empty_trend = empty_inFlows_full_total==0 && empty_outFlows_full_total==0? 0 : (empty_inFlows_full_total-empty_outFlows_full_total)/Math.max(empty_inFlows_full_total,empty_outFlows_full_total);
 
 		result.push({
 			id : d.id,
@@ -507,18 +507,11 @@ function addStats(stocks){
 	console.log("adding stats...");
 	stocks.forEach(function(d){
 		d.stats = (function(){
-			var inFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_full});
-			var outFlows_full_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_full});
-			var trend = inFlows_full_sum==0 && outFlows_full_sum==0? 0 : (inFlows_full_sum-outFlows_full_sum)/Math.max(inFlows_full_sum,outFlows_full_sum);
-
-			var inFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.inFlows_empty});
-			var outFlows_empty_sum = d3.sum(d.values, function(tStep){return tStep.outFlows_empty});
-			var trend_empty = inFlows_empty_sum==0 && outFlows_empty_sum==0? 0 : (inFlows_empty_sum-outFlows_empty_sum)/Math.max(inFlows_empty_sum,outFlows_empty_sum);
-
-			var inFlows_full_T = (d3.sum(d.values, function(tStep,i){return tStep.inFlows_full * i}) ) / inFlows_full_sum;
-			var outFlows_full_T = (d3.sum(d.values, function(tStep,i){return Math.abs(tStep.outFlows_full * i)}) ) / outFlows_full_sum;
-			var avgDepArrDist = Math.abs(inFlows_full_T-outFlows_full_T);
-
+			var inFlows_full_total = d3.sum(d.values, function(tStep){return tStep.inFlows_full})
+			var outFlows_full_total = d3.sum(d.values, function(tStep){return tStep.outFlows_full})
+			var inFlows_full_T = (d3.sum(d.values, function(tStep,i){return tStep.inFlows_full * i}) ) / inFlows_full_total;
+			var outFlows_full_T = (d3.sum(d.values, function(tStep,i){return Math.abs(tStep.outFlows_full * i)}) ) / outFlows_full_total;
+			var trend = (inFlows_full_total-outFlows_full_total)/Math.max(inFlows_full_total,outFlows_full_total);
 			var occupancy = d3.sum(d.values, function(tStep, i){
 				return d3.sum(d.values.slice(0,i+1), function(k){
 					return k.inFlows_full - k.outFlows_full;
@@ -534,33 +527,47 @@ function addStats(stocks){
 					return k.inFlows_full-k.outFlows_full;
 				}));
 			});
-
+			var occupancy_trend = d3.sum(d.values, function(tStep, i){
+				return d3.sum(d.values.slice(0,i+1), function(k){
+					if(trend>=0){
+						return trend * k.inFlows_full;
+					} else {
+						return trend * k.outFlows_full
+					}
+				});
+			});
+			var occupancy_seasonal = d3.sum(d.values, function(tStep, i){
+				return d3.sum(d.values.slice(0,i+1), function(k){
+					if(trend>=0){
+						return (1-trend) * k.inFlows_full - k.outFlows_full;
+					} else {
+						return k.outFlows_full - (1-trend) * k.outFlows_full;
+					}
+				});
+			});
 			return {
-				'inFlows_full_sum' : inFlows_full_sum,
-				'outFlows_full_sum' : outFlows_full_sum,
 				'trend'	: trend,
-
-				'inFlows_full_T': inFlows_full_T,
-				'outFlows_full_T': outFlows_full_T,
-				'avgDepArrDist' : avgDepArrDist,
-
 				'occupancy' : occupancy,
 				'occupancy_positive' : occupancy_positive,
 				'occupancy_negative' : occupancy_negative,
-
-
-
+				'occupancy_trend' : occupancy_trend,
+				'occupancy_seasonal' : occupancy_seasonal,
+				'inFlows_full_total' : inFlows_full_total,
+				'inFlows_full_T': inFlows_full_T,
+				'outFlows_full_total' : outFlows_full_total,
+				'outFlows_full_T': outFlows_full_T,
 				'res_degree' : inFlows_full_T-outFlows_full_T,
-				'sur_degree' : inFlows_full_sum-outFlows_full_sum,
+				'sur_degree' : inFlows_full_total-outFlows_full_total,
+
 				'type': (function(){
 					var rescom = inFlows_full_T>=outFlows_full_T? 'Res' : 'Com';
-					var surshor = inFlows_full_sum>=outFlows_full_sum? 'Sur' : 'Def';
+					var surshor = inFlows_full_total>=outFlows_full_total? 'Sur' : 'Def';
 					return rescom + surshor;
 				})(),
 				'RCSD': (function(){
 					var RCSD = [];
 					RCSD[0] = inFlows_full_T>=outFlows_full_T? 'R' : 'C';
-					RCSD[1] = inFlows_full_sum>=outFlows_full_sum? 'S' : 'D';
+					RCSD[1] = inFlows_full_total>=outFlows_full_total? 'S' : 'D';
 					return RCSD;
 				})()
 			};
@@ -568,30 +575,7 @@ function addStats(stocks){
 	})
 }
 
-/*********   Average Values   *********/
-function averageValues(stocks){
-	var timeStep = (stocks[0].values[1].date - stocks[0].values[0].date)/(1000 * 60)
-	var startDate = d3.time.day(stocks[0].values[Math.round(stocks[0].values.length/2)].date)// get the floor of the middle day
-	var endDate = new Date(+startDate+86400000);
-	var timeSteps = d3.time.minutes(startDate, endDate, timeStep);
-	var avgStocks = stocks.map(function(stock){
-		var avgStock = {};
-		for (p in stock) avgStock[p]=stock[p];
-		avgStock.values = timeSteps.map(function(tStep, i){
-			var entry = {};
-			var sameTimeSteps = stock.values.filter(function(d){
-				return d.date.getHours()==tStep.getHours() && d.date.getMinutes()==tStep.getMinutes();
-			});
-			for (p in stock.values[i]) {
-				entry[p] = d3.mean(sameTimeSteps, function(d){return d[p]});
-			}
-			entry.date = tStep
-			return entry;
-		})
-		return avgStock;
-	});
-  return avgStocks;
-}
+
 
 
 /*********   Module Exports   *********/
@@ -609,8 +593,6 @@ module.exports.setDomains= setDomains;
 module.exports.getMinimumInitials= getMinimumInitials;
 module.exports.getMinimumInitial= getMinimumInitial;
 module.exports.addStats= addStats;
-module.exports.averageValues= averageValues;
-
 
 
 
@@ -778,7 +760,7 @@ function setInitialLevels(trips, stocks, timeRange){
 
 
 // Use this to average an array of stocks, e.g. the outcome of getDataPerDay(trips, startDate, endDate);
-function averageValuesStack(flowRates){
+function averageFlowRates(flowRates){
 	var averageFlowRates = flowRates[0].map(function(d,k){
 		var avgFlowRate = {};
 		for (p in d) avgFlowRate[p]=d[p];
@@ -791,8 +773,55 @@ function averageValuesStack(flowRates){
 	})
   return averageFlowRates;
 }
-
-
+//use this function if your data range spans more than one days
+function averageFlowRates(flowRates){
+	var today = dateFormat.parse(dateFormat(new Date(Date.now())));
+	var tomorrow = new Date(+today+86400000);
+	var timeStep = (flowRates[0].values[1].date - flowRates[0].values[0].date)/(1000 * 60)
+	var timeSteps = d3.time.minutes(today, tomorrow, timeStep);
+	flowRates.forEach(function(flowRate){
+		flowRate.averageValues = timeSteps.map(function(entry){
+      var result = {};
+      result.date = d3.time.format("%H:%M:%S")(entry);
+      var sameTimeSteps = flowRate.values.filter(function(d){return d3.time.format("%H:%M:%S")(d.date) == result.date});
+      result.inFlows_full = d3.mean(sameTimeSteps, function(d){return d.inFlows_full});
+      result.outFlows_full = d3.mean(sameTimeSteps, function(d){return d.outFlows_full});
+      result.inFlows_empty = d3.mean(sameTimeSteps, function(d){return d.inFlows_empty});
+      result.outFlows_empty = d3.mean(sameTimeSteps, function(d){return d.outFlows_empty});
+      return result;
+    })
+	});
+  return flowRates;
+}
+function averageValues(stocks){
+	var today = dateFormat.parse(dateFormat(new Date(Date.now())));
+	var tomorrow = new Date(+today+86400000);
+	var timeStep = (stocks[0].values[1].date - stocks[0].values[0].date)/(1000 * 60)
+	var timeSteps = d3.time.minutes(today, tomorrow, timeStep);
+	stocks.forEach(function(stock){
+		stock.averageValues = d3.nest()
+		.key(function(d) {return d3.time.format("%H:%M:%S")(d.date)})
+		.entries(stock.values)
+		.map(function(entry, i){
+			return{
+				time: entry.key,
+				date: timeSteps[i],
+				bikes:d3.mean(entry.values, function(d){return d.bikes}),
+				bikesMarginal:d3.mean(entry.values, function(d){return d.bikesMarginal}),
+				bikesMinimum:d3.mean(entry.values, function(d){return d.bikesMinimum}),
+				bikesUncorrected:d3.mean(entry.values, function(d){return d.bikesUncorrected}),
+				dispatchInFlowRate:d3.mean(entry.values, function(d){return d.dispatchInFlowRate}),
+				dispatchOutFlowRate:d3.mean(entry.values, function(d){return d.dispatchOutFlowRate}),
+				inFlows_full:d3.mean(entry.values, function(d){return d.inFlows_full}),
+				outFlows_full:d3.mean(entry.values, function(d){return d.outFlows_full}),
+				// incoming_empty_trips: d3.merge(entry.values, function(d){return d.incoming_empty_trips}),
+				// incoming_full_trips: d3.merge(entry.values, function(d){return d.incoming_full_trips}),
+				// outgoing_empty_trips: d3.merge(entry.values, function(d){return d.outgoing_empty_trips}),
+				// outgoing_full_trips: d3.merge(entry.values, function(d){return d.outgoing_full_trips})
+			}
+		})
+	});
+}
 function setCorrectionFlowRates(stocks){
 	console.log("making correction flow rates...");
 	stocks.filter(function(d){return d.type=="station"}).forEach(function(stock,k){
