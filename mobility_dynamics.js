@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 // Last Update: Oct 26, 2020
-=======
-// Last Update: Oct 15, 2020
->>>>>>> 993885de309487dd7b5b773d061536bd72fee25c
 // © Dimitris Papanikolaou
 
 var d3 = require("d3");
@@ -580,11 +576,6 @@ function getFlowRateTrends(stock){
 }
 
 
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 993885de309487dd7b5b773d061536bd72fee25c
 /*********   Module Exports   *********/
 module.exports.getDynamics= getDynamics;
 module.exports.sortA= sortA;
